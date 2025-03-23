@@ -1,0 +1,335 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "Entrenched WW1 | why3",
+    Icon = 86379946153251,
+    LoadingTitle = "Loading Entrenched WW1",
+    LoadingSubtitle = "by why3",
+    Theme = "Amethyst", 
+    DisableRayfieldPrompts = false,
+    DisableBuildWarnings = false,
+
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = nil,
+        FileName = "Entrenched ww1"
+    },
+
+    Discord = {
+        Enabled = false,
+        Invite = "noinvitelink",
+        RememberJoins = true
+    },
+
+    KeySystem = true,
+    KeySettings = {
+        Title = "Entrenched WW1 Key System",
+        Subtitle = "Key System",
+        Note = "Ask why3 on dc for key to access",
+        FileName = "Entrenched",
+        SaveKey = true,
+        GrabKeyFromSite = true,
+        Key = {"09302010"}
+    }
+})
+
+local MainTab = Window:CreateTab("Home", nil)
+local Main = MainTab:CreateSection("Aimbot")
+
+local currentTarget = ""
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local Player = Players.LocalPlayer
+local Char = Player.Character
+local Mouse = Player:GetMouse()
+
+local Root = Char:WaitForChild("HumanoidRootPart")
+local Humanoid = Char:WaitForChild("Humanoid")
+local Prediction_Enable = true
+local SelectionBox = Instance.new("SelectionBox", script)
+SelectionBox.Color3 = Color3.fromRGB(255, 255, 255)
+SelectionBox.LineThickness = 0.02
+
+local A_1 = false
+local A_2 = false
+
+local players = game:GetService("Players")
+
+local list1 = {}
+
+local function updatePlayerList()
+    list1 = {}
+    for _, player in ipairs(players:GetPlayers()) do
+        if player.Character and player.Character:FindFirstChild("Humanoid").Health > 0 then
+            table.insert(list1, player.Name)
+        end
+    end
+end
+
+updatePlayerList()
+
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+local function isPlayerVisible(player)
+    if player == LocalPlayer then return false end
+    local character = player.Character
+    if not character or not character:FindFirstChild("Head") then return false end
+
+    local head = character.Head
+    local screenPosition, onScreen = Camera:WorldToViewportPoint(head.Position)
+
+    if onScreen then
+        local ray = Ray.new(Camera.CFrame.Position, (head.Position - Camera.CFrame.Position).Unit * 5000)
+        local hitPart = workspace:FindPartOnRayWithIgnoreList(ray, {LocalPlayer.Character, Camera})
+        return hitPart and hitPart:IsDescendantOf(character)
+    end
+    return false
+end
+
+local function getClosestPlayerHead()
+    local closestPlayer = nil
+    local closestDistance = math.huge
+    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player.Team ~= LocalPlayer.Team and isPlayerVisible(player) then
+            local character = player.Character
+            if character and character:FindFirstChild("Head") and player.Character:FindFirstChild("Humanoid").Health > 0 then
+                local head = character.Head
+                local screenPosition = Camera:WorldToViewportPoint(head.Position)
+                local distanceToCenter = (Vector2.new(screenPosition.X, screenPosition.Y) - screenCenter).Magnitude
+
+                if distanceToCenter < closestDistance then
+                    closestPlayer = player
+                    closestDistance = distanceToCenter
+                end
+            end
+        end
+    end
+    return closestPlayer
+end
+
+local function getClosestPlayer()
+    local closestPlayer = nil
+    local closestDistance = math.huge
+    local localCharacter = LocalPlayer.Character
+    local localRootPart = localCharacter and localCharacter:FindFirstChild("HumanoidRootPart")
+    if not localRootPart then return nil end
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local targetRootPart = player.Character.HumanoidRootPart
+            local distance = (localRootPart.Position - targetRootPart.Position).Magnitude
+
+            if distance < closestDistance then
+                closestDistance = distance
+                closestPlayer = player
+            end
+        end
+    end
+    return closestPlayer
+end
+
+local function faceClosestPlayer()
+    local localCharacter = LocalPlayer.Character
+    local localRootPart = localCharacter and localCharacter:FindFirstChild("HumanoidRootPart")
+    if not localRootPart then return end
+
+    local closestPlayer = getClosestPlayer()
+    if closestPlayer and closestPlayer.Character and closestPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local targetRootPart = closestPlayer.Character.HumanoidRootPart
+        local direction = (targetRootPart.Position - localRootPart.Position).Unit
+        localRootPart.CFrame = CFrame.new(localRootPart.Position, localRootPart.Position + direction)
+    end
+end
+
+local aimbot = false
+
+local Toggle = MainTab:CreateToggle({
+    Name = "Aimbot",
+    CurrentValue = false,
+    Flag = "aimbot",
+    Callback = function(Value)
+        aimbot = Value
+    end
+})
+
+RunService.RenderStepped:Connect(function()
+    if aimbot then
+        local target = getClosestPlayerHead()
+        if target and target.Character and target.Character:FindFirstChild("Head") then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Character.Head.Position)
+        end
+    end
+end)
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed and input.KeyCode == Enum.KeyCode.V then
+        aimbot = not aimbot
+        Toggle:Set(aimbot)
+
+        Rayfield:Notify({
+            Title = "Aimbot",
+            Content = aimbot and "Enabled" or "Disabled",
+            Duration = 2
+        })
+    end
+end)
+
+local Main = MainTab:CreateSection("ESP")
+local Button = MainTab:CreateButton({
+    Name = "Track all enemy/team",
+    Callback = function()
+        local Players = game:GetService("Players")
+
+        local function createHighlight(character)
+            if not character then return end
+
+            local highlight = character:FindFirstChild("Highlight")
+            if highlight then highlight:Destroy() end
+            highlight = Instance.new("Highlight")
+            highlight.Name = "Highlight"
+            highlight.Adornee = character
+            highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop -- Visible through walls
+            if Players:GetPlayerFromCharacter(character).Team~=Players.LocalPlayer.Team then
+                highlight.FillColor = Color3.new(1, 0.75, 0.796) -- Yellow glow (can be customized)
+            else 
+                highlight.FillColor = Color3.new(0, 1, 0)
+            end
+            highlight.FillTransparency = 0.3 -- Adjustable transparency
+            highlight.OutlineTransparency = 0 -- Fully visible outline
+            highlight.Parent = character
+        end
+
+        local function handlePlayerCharacter(player)
+            player.CharacterAdded:Connect(function(character)
+                createHighlight(character)
+            end)
+
+            if player.Character then
+                createHighlight(player.Character)
+            end
+        end
+
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= game:GetService("Players").LocalPlayer then
+                handlePlayerCharacter(player)
+            end
+        end
+
+        Players.PlayerAdded:Connect(function(player)
+            handlePlayerCharacter(player)
+        end)
+
+    end
+})
+
+local mh = game:GetService("Players").LocalPlayer.Character:WaitForChild("Humanoid").MaxHealth
+local h = game:GetService("Players").LocalPlayer.Character:WaitForChild("Humanoid").Health
+
+local Slider = MainTab:CreateSlider({
+    Name = "Health",
+    Range = {0, 10000000000},
+    Increment = 10000,
+    Suffix = "Health",
+    CurrentValue = h,
+    Flag = "HEALTH",
+    Callback = function(Value)
+        game:GetService("Players").LocalPlayer.Character.Humanoid.MaxHealth = (Value)
+        game:GetService("Players").LocalPlayer.Character.Humanoid.Health = (Value)
+        print(game:GetService("Players").LocalPlayer.Character.Humanoid.Health)
+    end
+})
+
+local healthregen = false
+
+local Toggle = MainTab:CreateToggle({
+    Name = "Health Regen",
+    CurrentValue = false,
+    Flag = "regen", -- regen
+    Callback = function(Value) healthregen = (Value) end
+})
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+
+local function getNearestPlayer()
+    local closestPlayer = nil
+    local shortestDistance = math.huge
+
+    local localCharacter = LocalPlayer.Character
+    if not localCharacter or not localCharacter:FindFirstChild("HumanoidRootPart") then
+        return nil
+    end
+
+    local localPosition = localCharacter.HumanoidRootPart.Position
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local distance = (player.Character.HumanoidRootPart.Position - localPosition).Magnitude
+            if distance < shortestDistance then
+                closestPlayer = player
+                shortestDistance = distance
+            end
+        end
+    end
+
+    return closestPlayer
+end
+
+local function teleportBehindNearestPlayer()
+    local nearestPlayer = getNearestPlayer()
+    if nearestPlayer and nearestPlayer.Character and nearestPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local targetRoot = nearestPlayer.Character.HumanoidRootPart
+        local backPosition = targetRoot.CFrame * CFrame.new(0, 0, 0.6)
+        local localCharacter = LocalPlayer.Character
+
+        if localCharacter and localCharacter:FindFirstChild("HumanoidRootPart") then
+            localCharacter.HumanoidRootPart.CFrame = CFrame.new(backPosition.Position)
+        end
+    else
+        print("No nearby player found.")
+    end
+end
+
+local Button=MainTab:CreateButton({
+    Name="TP Behind Player",
+    Callback=function()
+        teleportBehindNearestPlayer()
+    end
+})
+
+RunService.RenderStepped:Connect(function()
+    if healthregen then
+        game:GetService("Players").LocalPlayer.Character.Humanoid.Health = game:GetService("Players")
+                                                                 .LocalPlayer
+                                                                 .Character
+                                                                 .Humanoid
+                                                                 .MaxHealth
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if noclip then
+        for _, part in pairs(game:GetService("Players").LocalPlayer.Character:GetChildren()) do
+            if part:IsA("BasePart") then part.CanCollide = false end
+        end
+    else
+        for _, part in pairs(game:GetService("Players").LocalPlayer.Character:GetChildren()) do
+            if part:IsA("BasePart") then part.CanCollide = true end
+        end
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if aimbot then
+        local closestHead = getClosestPlayerHead()
+        if closestHead then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, closestHead.Character.Head.Position)
+        end
+    end
+end)
